@@ -224,6 +224,7 @@ def send_bulk_email(bulk_email_id):
     failed_emails = []
     with open(bulk_email.csv_file, mode='r') as file:
         reader = csv.DictReader(file)
+        columns = reader.fieldnames  # Get column headers for placeholders
         email_tasks = []
         with ThreadPoolExecutor(max_workers=10) as executor:
             for row in reader:
