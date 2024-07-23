@@ -1,0 +1,6 @@
+sql12721518
+sKDMJWv5a3
+
+
+every user gets a bulk email instance sheet named "{user id}.bulkemailinstances" and every 
+entry in the bulk email instance sheet gets a reports sheet named "{user id}.{bulk instance id}.report}"

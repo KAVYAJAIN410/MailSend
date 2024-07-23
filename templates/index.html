@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MailSend</title>
+    <style>
+        body {
+            background-color: #ffffff;
+            color: #1A1A2E;
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+
+        header {
+            background-color: #0c0614;
+            color: #ffffff;
+            text-align: left;
+            padding: 20px 0px;
+            width: 100%;
+        }
+
+        footer {
+            background-color: #0c0614;
+            color: #ffffff;
+            text-align: center;
+            padding: 20px 0px;
+            width: 100%;
+        }
+
+        header h1 {
+            margin: 0px 50px;
+        }
+
+        footer p {
+            margin: 0;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 15px 20px;
+        }
+
+        .container form {
+            width: 100%;
+            max-width: 600px;
+            background-color: #FFFFFF;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0px 0px 8px rgba(0, 0, 0, 0.270);
+            animation: fadeIn 2s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+
+        .container form section {
+            margin-bottom: 20px;
+            margin-right: 20px;
+        }
+
+        .container form section label {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: bold;
+            color: #1A1A2E;
+        }
+
+        .container form section input[type="text"],
+        .container form section input[type="password"],
+        .container form section input[type="file"],
+        .container form section textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #CCCCCC;
+            border-radius: 5px;
+            background-color: #F8F8F8;
+            color: #1A1A2E;
+            transition: background-color 0.3s ease, border-color 0.3s ease;
+            font-size: 16px;
+        }
+
+        .container form section input[type="text"]:focus,
+        .container form section input[type="password"]:focus,
+        .container form section input[type="file"]:focus,
+        .container form section textarea:focus {
+            background-color: #EAEAEA;
+            border-color: #533483;
+            outline: none;
+        }
+
+        .container form section textarea {
+            resize: vertical;
+        }
+
+        .container form input[type="submit"] {
+            background-color: #533483;
+            color: #EAEAEA;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s ease;
+        }
+
+        .container form input[type="submit"]:hover {
+            background-color: #3C2A59;
+        }
+
+        .container form input[type="submit"]:active {
+            background-color: #1A1A2E;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>MailSend</h1>
+    </header>
+    
+    <div class="container">
+        <form action="/send_emails" method="post" enctype="multipart/form-data">
+            <section>
+                <label for="subject">Email Subject:</label>
+                <input type="text" id="subject" name="subject" required>
+            </section>
+            
+            <section>
+                <label for="content">Email Content:</label>
+                <textarea id="content" name="content" rows="4" cols="50" required></textarea>
+            </section>
+            
+            <section>
+                <label for="csv_file">CSV File:</label>
+                <input type="file" id="csv_file" name="csv_file" accept=".csv" required>
+            </section>
+            
+            <section>
+                <label for="yagmail_user">Email ID:</label>
+                <input type="text" id="yagmail_user" name="yagmail_user" required>
+            </section>
+            
+            <section>
+                <label for="yagmail_password">Account Password:</label>
+                <input type="password" id="yagmail_password" name="yagmail_password" required>
+            </section>
+            
+            <input type="submit" value="Send Emails">
+        </form>
+    </div>
+    
+    <footer>
+        <p>&copy; 2024 MailSend</p>
+    </footer>
+</body>
+</html>

@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}Email App{% endblock %}</title>
+</head>
+<body>
+    <nav>
+        <ul>
+            {% if 'user' in session %}
+                <li><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
+                <li><a href="{{ url_for('email_settings') }}">Email Settings</a></li>
+                <li><a href="{{ url_for('logout') }}">Logout</a></li>
+            {% else %}
+                <li><a href="{{ url_for('login') }}">Login</a></li>
+                <li><a href="{{ url_for('signup') }}">Sign Up</a></li>
+            {% endif %}
+        </ul>
+    </nav>
+    <div>
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                <ul>
+                    {% for message in messages %}
+                        <li>{{ message }}</li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        {% endwith %}
+        {% block content %}{% endblock %}
+    </div>
+</body>
+</html>

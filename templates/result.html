@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block title %}Email Sending Results{% endblock %}
+
+{% block content %}
+    <h1>Email Sending Results</h1>
+    {% if failed_emails %}
+        <h2>Failed Emails:</h2>
+        <ul>
+            {% for entry in failed_emails %}
+                <li>Email: {{ entry.email }}, Name: {{ entry.name }}, Error: {{ entry.error }}</li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p>All emails were sent successfully!</p>
+    {% endif %}
+{% endblock %}

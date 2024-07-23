@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block title %}Bulk Email Settings{% endblock %}
+
+{% block content %}
+    <h1>Bulk Email Settings for "{{ bulk_email.name }}"</h1>
+    <form action="{{ url_for('bulk_email', bulk_email_id=bulk_email.id) }}" method="post" enctype="multipart/form-data">
+        <label for="subject">Email Subject:</label>
+        <input type="text" id="subject" name="subject" value="{{ bulk_email.subject_template }}" required><br><br>
+        
+        <label for="content">Email Content:</label><br>
+        <textarea id="content" name="content" rows="4" cols="50" required>{{ bulk_email.content_template }}</textarea><br><br>
+        
+        <label for="csv_file">CSV File:</label>
+        <input type="file" id="csv_file" name="csv_file" accept=".csv" required><br><br>
+        
+        <input type="submit" value="Save and Send">
+    </form>
+{% endblock %}

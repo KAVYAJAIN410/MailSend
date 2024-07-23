@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+    <h1>Dashboard</h1>
+    <p>Welcome, {{ user.username }}</p>
+    <p><a href="{{ url_for('email_settings') }}">Update Email Settings</a></p>
+    <p><a href="{{ url_for('create_bulk_email') }}">+ Create New Bulk Email</a></p>
+    <h2>Your Bulk Emails</h2>
+    <ul>
+        {% for bulk_email in bulk_emails %}
+            <li><a href="{{ url_for('report', bulk_email_id=bulk_email.id) }}">{{ bulk_email.name }}</a></li>
+        {% endfor %}
+    </ul>
+{% endblock %}
