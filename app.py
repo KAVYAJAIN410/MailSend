@@ -17,6 +17,7 @@ db = SQLAlchemy(app)
 
 # User model
 class User(db.Model):
+    __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(200), nullable=False)
@@ -24,23 +25,25 @@ class User(db.Model):
     yagmail_password = db.Column(db.String(120))
     bulk_emails = db.relationship('BulkEmailInstance', backref='user', lazy=True)
 
-# Email tracking model
-class EmailTracking(db.Model):
-    id = db.Column(db.String(36), primary_key=True)
-    email = db.Column(db.String(120), nullable=False)
-    name = db.Column(db.String(120), nullable=False)
-    opened = db.Column(db.Boolean, default=False)
-    bulk_email_id = db.Column(db.Integer, db.ForeignKey('bulk_email_instance.id'), nullable=False)
-
 # Bulk email instance model
 class BulkEmailInstance(db.Model):
+    __tablename__ = 'bulk_email_instances'
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     name = db.Column(db.String(120), nullable=False)
     subject_template = db.Column(db.String(200))
     content_template = db.Column(db.Text)
     csv_file = db.Column(db.String(200))
     email_trackings = db.relationship('EmailTracking', backref='bulk_email_instance', lazy=True)
+
+# Email tracking model
+class EmailTracking(db.Model):
+    __tablename__ = 'email_tracking'
+    id = db.Column(db.String(36), primary_key=True)
+    email = db.Column(db.String(120), nullable=False)
+    name = db.Column(db.String(120), nullable=False)
+    opened = db.Column(db.Boolean, default=False)
+    bulk_email_id = db.Column(db.Integer, db.ForeignKey('bulk_email_instances.id'), nullable=False)
 
 # Initialize the database
 with app.app_context():
@@ -109,7 +112,7 @@ def login():
 
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
-    if request.method == ['POST']:
+    if request.method == 'POST':  # Corrected method check
         username = request.form['username']
         password = request.form['password']
         if User.query.filter_by(username=username).first():
@@ -133,6 +136,9 @@ def dashboard():
     if 'user' not in session:
         return redirect(url_for('login'))
     user = User.query.filter_by(username=session['user']).first()
+    if user is None:
+        flash('User not found. Please log in again.')
+        return redirect(url_for('login'))
     bulk_emails = BulkEmailInstance.query.filter_by(user_id=user.id).all()
     return render_template('dashboard.html', user=user, bulk_emails=bulk_emails)
 
@@ -141,6 +147,9 @@ def email_settings():
     if 'user' not in session:
         return redirect(url_for('login'))
     user = User.query.filter_by(username=session['user']).first()
+    if user is None:
+        flash('User not found. Please log in again.')
+        return redirect(url_for('login'))
     if request.method == 'POST':
         yagmail_user = request.form['yagmail_user']
         yagmail_password = request.form['yagmail_password']
@@ -155,8 +164,11 @@ def email_settings():
 def create_bulk_email():
     if 'user' not in session:
         return redirect(url_for('login'))
-    if request.method == 'POST':
-        user = User.query.filter_by(username=session['user']).first()
+    user = User.query.filter_by(username=session['user']).first()
+    if user is None:
+        flash('User not found. Please log in again.')
+        return redirect(url_for('login'))
+    if request.method == 'POST':  # Corrected method check
         name = request.form['name']
         bulk_email = BulkEmailInstance(user_id=user.id, name=name)
         db.session.add(bulk_email)
@@ -167,6 +179,10 @@ def create_bulk_email():
 @app.route('/bulk_email/<int:bulk_email_id>', methods=['GET', 'POST'])
 def bulk_email(bulk_email_id):
     if 'user' not in session:
+        return redirect(url_for('login'))
+    user = User.query.filter_by(username=session['user']).first()
+    if user is None:
+        flash('User not found. Please log in again.')
         return redirect(url_for('login'))
     bulk_email = BulkEmailInstance.query.get_or_404(bulk_email_id)
     if request.method == 'POST':
@@ -189,8 +205,11 @@ def bulk_email(bulk_email_id):
 def send_bulk_email(bulk_email_id):
     if 'user' not in session:
         return redirect(url_for('login'))
-    bulk_email = BulkEmailInstance.query.get_or_404(bulk_email_id)
     user = User.query.filter_by(username=session['user']).first()
+    if user is None:
+        flash('User not found. Please log in again.')
+        return redirect(url_for('login'))
+    bulk_email = BulkEmailInstance.query.get_or_404(bulk_email_id)
     if not user.yagmail_user or not user.yagmail_password:
         flash('Email settings are required before sending emails.')
         return redirect(url_for('email_settings'))
@@ -215,6 +234,10 @@ def send_bulk_email(bulk_email_id):
 @app.route('/report/<int:bulk_email_id>')
 def report(bulk_email_id):
     if 'user' not in session:
+        return redirect(url_for('login'))
+    user = User.query.filter_by(username=session['user']).first()
+    if user is None:
+        flash('User not found. Please log in again.')
         return redirect(url_for('login'))
     bulk_email = BulkEmailInstance.query.get_or_404(bulk_email_id)
     tracking_data = EmailTracking.query.filter_by(bulk_email_id=bulk_email_id).all()
