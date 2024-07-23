@@ -178,10 +178,24 @@ def create_bulk_email():
         return redirect(url_for('login'))
     if request.method == 'POST':
         name = request.form['name']
-        bulk_email = BulkEmailInstance(user_id=user.id, name=name)
+        csv_file = request.files.get('csv_file')
+        if not name or not csv_file:
+            flash('All fields are required.')
+            return redirect(url_for('create_bulk_email'))
+
+        # Save the CSV file and extract column names
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], csv_file.filename)
+        csv_file.save(file_path)
+
+        with open(file_path, mode='r') as file:
+            reader = csv.DictReader(file)
+            tags = reader.fieldnames
+
+        bulk_email = BulkEmailInstance(user_id=user.id, name=name, csv_file=file_path)
         db.session.add(bulk_email)
         db.session.commit()
-        return redirect(url_for('bulk_email', bulk_email_id=bulk_email.id))
+
+        return redirect(url_for('bulk_email', bulk_email_id=bulk_email.id, tags=','.join(tags)))
     return render_template('create_bulk_email.html')
 
 @app.route('/bulk_email/<int:bulk_email_id>', methods=['GET', 'POST'])
@@ -193,21 +207,30 @@ def bulk_email(bulk_email_id):
         flash('User not found. Please log in again.')
         return redirect(url_for('login'))
     bulk_email = BulkEmailInstance.query.get_or_404(bulk_email_id)
+    tags = []
+    if bulk_email.csv_file:
+        with open(bulk_email.csv_file, mode='r') as file:
+            reader = csv.DictReader(file)
+            tags = reader.fieldnames
     if request.method == 'POST':
         subject_template = request.form['subject']
         content_template = request.form['content']
-        csv_file = request.files['csv_file']
-        if not subject_template or not content_template or not csv_file:
+        csv_file = request.files.get('csv_file')
+        if not subject_template or not content_template:
             flash('All fields are required.')
             return redirect(url_for('bulk_email', bulk_email_id=bulk_email_id))
-        file_path = os.path.join(app.config['UPLOAD_FOLDER'], csv_file.filename)
-        csv_file.save(file_path)
+        if csv_file:
+            file_path = os.path.join(app.config['UPLOAD_FOLDER'], csv_file.filename)
+            csv_file.save(file_path)
+            bulk_email.csv_file = file_path
+            with open(file_path, mode='r') as file:
+                reader = csv.DictReader(file)
+                tags = reader.fieldnames
         bulk_email.subject_template = subject_template
         bulk_email.content_template = content_template
-        bulk_email.csv_file = file_path
         db.session.commit()
         return redirect(url_for('send_bulk_email', bulk_email_id=bulk_email.id))
-    return render_template('bulk_email.html', bulk_email=bulk_email)
+    return render_template('bulk_email.html', bulk_email=bulk_email, tags=','.join(tags))
 
 @app.route('/send_bulk_email/<int:bulk_email_id>', methods=['GET', 'POST'])
 def send_bulk_email(bulk_email_id):
@@ -250,6 +273,17 @@ def report(bulk_email_id):
     bulk_email = BulkEmailInstance.query.get_or_404(bulk_email_id)
     tracking_data = EmailTracking.query.filter_by(bulk_email_id=bulk_email_id).all()
     return render_template('report.html', tracking_data=tracking_data, bulk_email=bulk_email)
+
+@app.route('/get_csv_headers/<int:bulk_email_id>')
+def get_csv_headers(bulk_email_id):
+    bulk_email = BulkEmailInstance.query.get_or_404(bulk_email_id)
+    headers = []
+    if bulk_email.csv_file:
+        with open(bulk_email.csv_file, mode='r') as file:
+            reader = csv.DictReader(file)
+            headers = reader.fieldnames
+    return {'headers': headers}
+
 
 if __name__ == '__main__':
     app.run(debug=True)

@@ -3,17 +3,37 @@
 {% block title %}Bulk Email Settings{% endblock %}
 
 {% block content %}
-    <h1>Bulk Email Settings for "{{ bulk_email.name }}"</h1>
-    <form action="{{ url_for('bulk_email', bulk_email_id=bulk_email.id) }}" method="post" enctype="multipart/form-data">
-        <label for="subject">Email Subject:</label>
-        <input type="text" id="subject" name="subject" value="{{ bulk_email.subject_template }}" required><br><br>
-        
-        <label for="content">Email Content:</label><br>
-        <textarea id="content" name="content" rows="4" cols="50" required>{{ bulk_email.content_template }}</textarea><br><br>
-        
-        <label for="csv_file">CSV File:</label>
-        <input type="file" id="csv_file" name="csv_file" accept=".csv" required><br><br>
-        
-        <input type="submit" value="Save and Send">
+
+    <h1>Configure Bulk Email</h1>
+    <form method="POST" enctype="multipart/form-data">
+        <label for="subject">Subject Template:</label>
+        <input type="text" id="subject" name="subject" required>
+        <br>
+        <label for="content">Content Template:</label>
+        <textarea id="content" name="content" required></textarea>
+        <br>
+        <button type="submit">Save and Continue</button>
     </form>
+
+    <div id="dropdown" data-tags="{{ tags|safe }}"></div>
+    <script src="{{ url_for('static', filename='dropdown.js') }}"></script>
+
+    <style>
+        #dropdown {
+            display: none;
+            position: absolute;
+            background-color: white;
+            border: 1px solid #ccc;
+            z-index: 1000;
+        }
+
+        .dropdown-item {
+            padding: 8px;
+            cursor: pointer;
+        }
+
+        .dropdown-item:hover {
+            background-color: #f0f0f0;
+        }
+    </style>
 {% endblock %}

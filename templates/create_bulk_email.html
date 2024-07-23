@@ -4,9 +4,12 @@
 
 {% block content %}
     <h1>Create Bulk Email</h1>
-    <form action="{{ url_for('create_bulk_email') }}" method="post">
+    <form action="{{ url_for('create_bulk_email') }}" method="post" enctype="multipart/form-data">
         <label for="name">Bulk Email Name:</label>
         <input type="text" id="name" name="name" required><br><br>
+        <label for="csv_file">CSV File:</label>
+        <input type="file" id="csv_file" name="csv_file" required>
+        <br>
         <input type="submit" value="Create">
     </form>
 {% endblock %}
