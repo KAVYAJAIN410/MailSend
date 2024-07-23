@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, session, send_file
+from flask import Flask, render_template, request, redirect, url_for, flash, session, send_file, current_app
 import yagmail
 import csv
 import os
@@ -68,28 +68,36 @@ def track_email(id):
     log_email_open(id)
     return send_file('tracking_pixel.png', mimetype='image/png')
 
-def send_email(yagmail_user, yagmail_password, email, name, subject_template, content_template, tracking_url, bulk_email_id):
+def replace_tags(template, row):
+    app.logger.info(f"Original template: {template}")
+    app.logger.info(f"Row data: {row}")
+    for key, value in row.items():
+        template = template.replace(f"{{{{ {key} }}}}", value)
+    app.logger.info(f"Processed template: {template}")
+    return template
+
+def send_email(yagmail_user, yagmail_password, email, row, subject_template, content_template, tracking_url, bulk_email_id):
     unique_id = str(uuid.uuid4())
-    subject = subject_template.format(name=name)
-    contents = content_template.format(name=name) + f'<img src="{tracking_url}" alt="Tracking Pixel" style="display:none;"/>'
-    
+    subject = replace_tags(subject_template, row)
+    contents = replace_tags(content_template, row) + f'<img src="{tracking_url}" alt="Tracking Pixel" style="display:none;"/>'
+
     yag = yagmail.SMTP(yagmail_user, yagmail_password)
-    
+
     try:
         yag.send(to=email, subject=subject, contents=[contents])
         with app.app_context():
-            app.logger.info(f"Email sent to {name} at {email}")
+            app.logger.info(f"Email sent to {row['name']} at {email}")
             app.logger.info(f"Tracking URL embedded in email: {tracking_url}")
-            
-            email_tracking = EmailTracking(id=unique_id, email=email, name=name, bulk_email_id=bulk_email_id)
+
+            email_tracking = EmailTracking(id=unique_id, email=email, name=row['name'], bulk_email_id=bulk_email_id)
             db.session.add(email_tracking)
             db.session.commit()
 
         return None  # No error
     except Exception as e:
         with app.app_context():
-            app.logger.error(f"Failed to send email to {name} at {email}. Error: {e}")
-        return {'email': email, 'name': name, 'error': str(e)}
+            app.logger.error(f"Failed to send email to {row['name']} at {email}. Error: {e}")
+        return {'email': email, 'name': row['name'], 'error': str(e)}
 
 @app.route('/')
 def index():
@@ -112,7 +120,7 @@ def login():
 
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
-    if request.method == 'POST':  # Corrected method check
+    if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
         if User.query.filter_by(username=username).first():
@@ -168,7 +176,7 @@ def create_bulk_email():
     if user is None:
         flash('User not found. Please log in again.')
         return redirect(url_for('login'))
-    if request.method == 'POST':  # Corrected method check
+    if request.method == 'POST':
         name = request.form['name']
         bulk_email = BulkEmailInstance(user_id=user.id, name=name)
         db.session.add(bulk_email)
@@ -220,10 +228,9 @@ def send_bulk_email(bulk_email_id):
         with ThreadPoolExecutor(max_workers=10) as executor:
             for row in reader:
                 email = row['email']
-                name = row['name']
                 tracking_url = url_for('track_email', id=str(uuid.uuid4()), _external=True)
                 email_tasks.append(
-                    executor.submit(send_email, user.yagmail_user, user.yagmail_password, email, name, bulk_email.subject_template, bulk_email.content_template, tracking_url, bulk_email.id)
+                    executor.submit(send_email, user.yagmail_user, user.yagmail_password, email, row, bulk_email.subject_template, bulk_email.content_template, tracking_url, bulk_email.id)
                 )
             for future in as_completed(email_tasks):
                 result = future.result()
