@@ -7,14 +7,13 @@ body {
 }
 
 .container {
-    margin: 40 20 20 0;
+    margin: 20 20 20 0;
     padding: 0 20px;
 }
 
 .container1 {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 0 40px;
+    margin: 0 0 0 0;
+    padding: 0 0px;
 }
 
 .header {
@@ -87,7 +86,6 @@ main {
     color: #fff;
     text-align: center;
     padding: 20px 0;
-    margin-top: 40px;
 }
 
 .footer p {
@@ -127,4 +125,46 @@ main {
 
 .btn:hover {
     background-color: #333;
+}
+
+.background-container {
+    background-image: url('../images/51124.jpg');
+    background-size: cover;
+    background-position: center;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    color: white;
+    position: relative;
+}
+
+.overlay-content {
+    background-color: rgba(0, 0, 0, 0.5);
+    padding: 20px;
+    border-radius: 10px;
+}
+
+.overlay-content h2 {
+    margin-bottom: 15px;
+    font-size: 2.5rem;
+}
+
+.overlay-content p {
+    margin-bottom: 20px;
+    font-size: 1.25rem;
+}
+
+.overlay-content .btn {
+    background-color: #ff5e5e;
+    padding: 10px 20px;
+    color: white;
+    text-decoration: none;
+    border-radius: 5px;
+    font-size: 1.25rem;
+}
+
+.overlay-content .btn:hover {
+    background-color: #ff3a3a;
 }
