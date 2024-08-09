@@ -9,7 +9,7 @@ import uuid
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://sql12721518:sKDMJWv5a3@sql12.freesqldatabase.com:3306/sql12721518'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://sql12724990:ezZge92g7n@sql12.freesqldatabase.com:3306/sql12724990'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.secret_key = 'your_secret_key'  # Required for flash messages
 
@@ -99,8 +99,12 @@ def send_email(yagmail_user, yagmail_password, email, row, subject_template, con
 @app.route('/')
 def index():
     if 'user' not in session:
-        return redirect(url_for('login'))
+        return redirect(url_for('home'))
     return redirect(url_for('dashboard'))
+
+@app.route('/home')
+def home():
+    return render_template('home.html')
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -134,12 +138,12 @@ def signup():
 @app.route('/logout')
 def logout():
     session.pop('user', None)
-    return redirect(url_for('login'))
+    return redirect(url_for('home'))
 
 @app.route('/dashboard')
 def dashboard():
     if 'user' not in session:
-        return redirect(url_for('login'))
+        return redirect(url_for('home'))
     user = User.query.filter_by(username=session['user']).first()
     if user is None:
         flash('User not found. Please log in again.')
@@ -150,7 +154,7 @@ def dashboard():
 @app.route('/email_settings', methods=['GET', 'POST'])
 def email_settings():
     if 'user' not in session:
-        return redirect(url_for('login'))
+        return redirect(url_for('home'))
     user = User.query.filter_by(username=session['user']).first()
     if user is None:
         flash('User not found. Please log in again.')
@@ -168,7 +172,7 @@ def email_settings():
 @app.route('/create_bulk_email', methods=['GET', 'POST'])
 def create_bulk_email():
     if 'user' not in session:
-        return redirect(url_for('login'))
+        return redirect(url_for('home'))
     user = User.query.filter_by(username=session['user']).first()
     if user is None:
         flash('User not found. Please log in again.')
@@ -184,7 +188,7 @@ def create_bulk_email():
 @app.route('/bulk_email/<int:bulk_email_id>', methods=['GET', 'POST'])
 def bulk_email(bulk_email_id):
     if 'user' not in session:
-        return redirect(url_for('login'))
+        return redirect(url_for('home'))
     user = User.query.filter_by(username=session['user']).first()
     if user is None:
         flash('User not found. Please log in again.')
@@ -209,7 +213,7 @@ def bulk_email(bulk_email_id):
 @app.route('/send_bulk_email/<int:bulk_email_id>', methods=['GET', 'POST'])
 def send_bulk_email(bulk_email_id):
     if 'user' not in session:
-        return redirect(url_for('login'))
+        return redirect(url_for('home'))
     user = User.query.filter_by(username=session['user']).first()
     if user is None:
         flash('User not found. Please log in again.')
@@ -222,7 +226,7 @@ def send_bulk_email(bulk_email_id):
     with open(bulk_email.csv_file, mode='r') as file:
         reader = csv.DictReader(file)
         email_tasks = []
-        with ThreadPoolExecutor(max_workers=10) as executor:
+        with ThreadPoolExecutor(max_workers=20) as executor:
             for row in reader:
                 email = row['email']
                 tracking_url = url_for('track_email', id=str(uuid.uuid4()), _external=True)
@@ -238,7 +242,7 @@ def send_bulk_email(bulk_email_id):
 @app.route('/report/<int:bulk_email_id>')
 def report(bulk_email_id):
     if 'user' not in session:
-        return redirect(url_for('login'))
+        return redirect(url_for('home'))
     user = User.query.filter_by(username=session['user']).first()
     if user is None:
         flash('User not found. Please log in again.')
