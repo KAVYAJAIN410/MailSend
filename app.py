@@ -23,6 +23,7 @@ class User(db.Model):
     password_hash = db.Column(db.String(200), nullable=False)
     yagmail_user = db.Column(db.String(120))
     yagmail_password = db.Column(db.String(120))
+    email_settings_completed = db.Column(db.Boolean, default=False)  # New field
     bulk_emails = db.relationship('BulkEmailInstance', backref='user', lazy=True)
 
 # Bulk email instance model
@@ -114,6 +115,8 @@ def login():
         user = User.query.filter_by(username=username).first()
         if user and check_password_hash(user.password_hash, password):
             session['user'] = username
+            if not user.email_settings_completed:
+                return redirect(url_for('email_settings'))
             return redirect(url_for('dashboard'))
         else:
             flash('Invalid username or password')
@@ -128,7 +131,7 @@ def signup():
             flash('Username already exists')
         else:
             password_hash = generate_password_hash(password)
-            new_user = User(username=username, password_hash=password_hash)
+            new_user = User(username=username, password_hash=password_hash, email_settings_completed=False)
             db.session.add(new_user)
             db.session.commit()
             flash('Signup successful, please login')
@@ -164,6 +167,7 @@ def email_settings():
         yagmail_password = request.form['yagmail_password']
         user.yagmail_user = yagmail_user
         user.yagmail_password = yagmail_password
+        user.email_settings_completed = True  # Mark as completed
         db.session.commit()
         flash('Email settings updated successfully')
         return redirect(url_for('dashboard'))
