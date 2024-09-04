@@ -8,12 +8,13 @@ body {
 
 .container {
     margin: 20 20 20 0;
-    padding: 0 20px;
+    padding: 20 auto;
 }
 
 .container1 {
     margin: 0 0 0 0;
     padding: 0 0px;
+    min-height: 600px;
 }
 
 .header {
@@ -26,6 +27,7 @@ body {
     display: inline-block;
     font-size: 25px;
     font-weight: bold;
+    padding-left: 2%;
 }
 
 .header .logo a {
@@ -35,6 +37,7 @@ body {
 
 .header nav {
     float: right;
+    padding-right: 3%;
 }
 
 .header .nav_links {
@@ -167,4 +170,29 @@ main {
 
 .overlay-content .btn:hover {
     background-color: #ff3a3a;
+}
+/* static/css/styles.css */
+.error-page {
+    text-align: center;
+    margin-top: 100px;
+}
+
+.error-page h1 {
+    font-size: 3em;
+    color: #dc3545; /* Bootstrap danger color */
+}
+
+.error-page p {
+    font-size: 1.2em;
+    margin-top: 20px;
+}
+
+.error-page a {
+    color: #007bff; /* Bootstrap primary color */
+    text-decoration: none;
+    font-weight: bold;
+}
+
+.error-page a:hover {
+    text-decoration: underline;
 }

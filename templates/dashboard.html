@@ -10,7 +10,12 @@
     <h2>Your Bulk Emails</h2>
     <ul>
         {% for bulk_email in bulk_emails %}
-            <li><a href="{{ url_for('report', bulk_email_id=bulk_email.id) }}">{{ bulk_email.name }}</a></li>
+            <li>
+                <a href="{{ url_for('email_report', bulk_email_id=bulk_email.id) }}">{{ bulk_email.name }}</a>
+                <form action="{{ url_for('delete_bulk_email', bulk_email_id=bulk_email.id) }}" method="POST" style="display:inline;">
+                    <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure you want to delete this bulk email?');">Delete</button>
+                </form>
+            </li>
         {% endfor %}
     </ul>
 {% endblock %}

@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}Email Report for "{{ bulk_email.name }}"{% endblock %}
+
+{% block content %}
+    <h1>Email Report for "{{ bulk_email.name }}"</h1>
+
+    <form method="GET" id="filter-form">
+        <label for="filter">Show:</label>
+        <select name="filter" id="filter" onchange="document.getElementById('filter-form').submit();">
+            <option value="all" {% if filter == 'all' %}selected{% endif %}>All</option>
+            <option value="success" {% if filter == 'success' %}selected{% endif %}>Opened</option>
+            <option value="failed" {% if filter == 'failed' %}selected{% endif %}>Not Opened</option>
+        </select>
+    </form>
+
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Email</th>
+                <th>Name</th>
+                <th>Sent</th>
+                <th>Opened</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for tracking in tracking_data %}
+                <tr>
+                    <td>{{ tracking.email }}</td>
+                    <td>{{ tracking.name }}</td>
+                    {% if tracking.sent %}
+                        <td style="color: green;">Sent</td>
+                    {% else %}
+                        <td style="color: red;">Not Sent</td>
+                    {% endif %}
+                    {% if tracking.opened %}
+                        <td style="color: green;">&#x2714; Yes</td>
+                    {% else %}
+                        <td style="color: red;">&#x2716; No</td>
+                    {% endif %}
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    {% if not tracking_data %}
+        <p>No email data to display.</p>
+    {% endif %}
+{% endblock %}

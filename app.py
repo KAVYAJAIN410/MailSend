@@ -9,7 +9,7 @@ import uuid
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://sql12724990:ezZge92g7n@sql12.freesqldatabase.com:3306/sql12724990'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://sql12729491:55dB6xaFqJ@sql12.freesqldatabase.com:3306/sql12729491'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.secret_key = 'your_secret_key'  # Required for flash messages
 
@@ -44,7 +44,10 @@ class EmailTracking(db.Model):
     email = db.Column(db.String(120), nullable=False)
     name = db.Column(db.String(120), nullable=False)
     opened = db.Column(db.Boolean, default=False)
+    sent = db.Column(db.Boolean, default=False)
     bulk_email_id = db.Column(db.Integer, db.ForeignKey('bulk_email_instances.id'), nullable=False)
+
+    __table_args__ = (db.UniqueConstraint('email', 'bulk_email_id', name='_email_bulk_email_uc'),)
 
 # Initialize the database
 with app.app_context():
@@ -173,6 +176,27 @@ def email_settings():
         return redirect(url_for('dashboard'))
     return render_template('email_settings.html', user=user)
 
+@app.route('/delete_bulk_email/<int:bulk_email_id>', methods=['POST'])
+def delete_bulk_email(bulk_email_id):
+    if 'user' not in session:
+        return redirect(url_for('home'))
+    user = User.query.filter_by(username=session['user']).first()
+    if user is None:
+        flash('User not found. Please log in again.')
+        return redirect(url_for('login'))
+    # Find the bulk email instance and ensure it belongs to the logged-in user
+    bulk_email = BulkEmailInstance.query.filter_by(id=bulk_email_id, user_id=user.id).first()
+    if bulk_email:
+        # Delete all associated EmailTracking records first
+        EmailTracking.query.filter_by(bulk_email_id=bulk_email.id).delete()
+        # Delete the BulkEmailInstance
+        db.session.delete(bulk_email)
+        db.session.commit()
+        flash('Bulk email instance deleted successfully')
+    else:
+        flash('Bulk email instance not found or you do not have permission to delete it')
+    return redirect(url_for('dashboard'))
+
 @app.route('/create_bulk_email', methods=['GET', 'POST'])
 def create_bulk_email():
     if 'user' not in session:
@@ -214,6 +238,30 @@ def bulk_email(bulk_email_id):
         return redirect(url_for('send_bulk_email', bulk_email_id=bulk_email.id))
     return render_template('bulk_email.html', bulk_email=bulk_email)
 
+def update_email_tracking(id, opened=None, sent=None):
+    try:
+        # Find the entry by ID
+        email_tracking = EmailTracking.query.get(id)
+        if email_tracking:
+            # Update the fields if provided
+            if opened is not None:
+                email_tracking.opened = opened
+            if sent is not None:
+                email_tracking.sent = sent
+
+            # Commit the changes to the database
+            db.session.commit()
+            app.logger.info(f"EmailTracking entry with ID {id} updated successfully.")
+            return True
+        else:
+            app.logger.warning(f"No EmailTracking entry found with ID: {id}")
+            return False
+    except Exception as e:
+        app.logger.error(f"Error updating EmailTracking entry with ID: {id}. Error: {e}")
+        return False
+
+
+
 @app.route('/send_bulk_email/<int:bulk_email_id>', methods=['GET', 'POST'])
 def send_bulk_email(bulk_email_id):
     if 'user' not in session:
@@ -226,34 +274,77 @@ def send_bulk_email(bulk_email_id):
     if not user.yagmail_user or not user.yagmail_password:
         flash('Email settings are required before sending emails.')
         return redirect(url_for('email_settings'))
-    failed_emails = []
+
     with open(bulk_email.csv_file, mode='r') as file:
         reader = csv.DictReader(file)
-        email_tasks = []
-        with ThreadPoolExecutor(max_workers=20) as executor:
-            for row in reader:
-                email = row['email']
-                tracking_url = url_for('track_email', id=str(uuid.uuid4()), _external=True)
-                email_tasks.append(
-                    executor.submit(send_email, user.yagmail_user, user.yagmail_password, email, row, bulk_email.subject_template, bulk_email.content_template, tracking_url, bulk_email.id)
-                )
-            for future in as_completed(email_tasks):
-                result = future.result()
-                if result:
-                    failed_emails.append(result)
-    return render_template('result.html', failed_emails=failed_emails)
+        for row in reader:
+            email = row['email']
+            tracking_url = url_for('track_email', id=str(uuid.uuid4()), _external=True)
 
-@app.route('/report/<int:bulk_email_id>')
-def report(bulk_email_id):
+            # Check if an entry already exists for this email and bulk_email_id
+            existing_tracking = EmailTracking.query.filter_by(
+                email=email, bulk_email_id=bulk_email_id
+            ).first()
+
+            if existing_tracking:
+                # Update the existing entry with new send status or any other changes
+                try:
+                    send_email(user.yagmail_user, user.yagmail_password, email, row, bulk_email.subject_template, bulk_email.content_template, tracking_url, bulk_email.id)
+                    update_email_tracking(existing_tracking.id, sent=True)
+                    flash(f"Updated and resent email to {email}.")
+                except Exception as e:
+                    app.logger.error(f"Failed to resend email to {email}. Error: {e}")
+            else:
+                # Send email and create a new tracking entry
+                try:
+                    send_email(user.yagmail_user, user.yagmail_password, email, row, bulk_email.subject_template, bulk_email.content_template, tracking_url, bulk_email.id)
+                    email_tracking = EmailTracking(
+                        id=str(uuid.uuid4()),
+                        email=email,
+                        name=row['name'],
+                        opened=False,
+                        sent=True,
+                        bulk_email_id=bulk_email_id
+                    )
+                    db.session.add(email_tracking)
+                    db.session.commit()
+                    flash(f"Email sent to {email}.")
+                except Exception as e:
+                    app.logger.error(f"Failed to send email to {email}. Error: {e}")
+
+    flash('Emails have been sent!')
+    return redirect(url_for('email_report', bulk_email_id=bulk_email_id))
+
+@app.route('/email_report/<int:bulk_email_id>', methods=['GET'])
+def email_report(bulk_email_id):
     if 'user' not in session:
-        return redirect(url_for('home'))
+        return redirect(url_for('content', page='home'))
     user = User.query.filter_by(username=session['user']).first()
     if user is None:
         flash('User not found. Please log in again.')
-        return redirect(url_for('login'))
+        return redirect(url_for('content', page='login'))
     bulk_email = BulkEmailInstance.query.get_or_404(bulk_email_id)
+
+    # Retrieve tracking data from the database
     tracking_data = EmailTracking.query.filter_by(bulk_email_id=bulk_email_id).all()
-    return render_template('report.html', tracking_data=tracking_data, bulk_email=bulk_email)
+
+    # Handle filter option
+    filter_option = request.args.get('filter', 'all')
+    if filter_option == 'success':
+        tracking_data = [tracking for tracking in tracking_data if tracking.opened]
+    elif filter_option == 'failed':
+        tracking_data = [tracking for tracking in tracking_data if not tracking.opened]
+
+    return render_template('email_report.html', tracking_data=tracking_data, bulk_email=bulk_email, filter=filter_option)
+
+@app.errorhandler(404)
+def not_found_error(error):
+    return render_template('error.html'), 404
+
+@app.errorhandler(500)
+def internal_error(error):
+    # Add logging or other error handling here if needed
+    return render_template('error.html'), 500
 
 if __name__ == '__main__':
     app.run(debug=True)

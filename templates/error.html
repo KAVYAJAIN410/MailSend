@@ -1,0 +1,12 @@
+<!-- templates/error.html -->
+{% extends "base.html" %}
+
+{% block title %}Error{% endblock %}
+
+{% block content %}
+    <div class="error-page">
+        <h1>Oops!</h1>
+        <p>Sorry for the inconvenience. Something went wrong on our end.</p>
+        <p><a href="{{ url_for('content', page='home') }}">Return to Home</a></p>
+    </div>
+{% endblock %}
