@@ -238,85 +238,100 @@ def bulk_email(bulk_email_id):
         return redirect(url_for('send_bulk_email', bulk_email_id=bulk_email.id))
     return render_template('bulk_email.html', bulk_email=bulk_email)
 
-def update_email_tracking(id, opened=None, sent=None):
+def update_sent_status(id):
     try:
         # Find the entry by ID
         email_tracking = EmailTracking.query.get(id)
+
         if email_tracking:
-            # Update the fields if provided
-            if opened is not None:
-                email_tracking.opened = opened
-            if sent is not None:
-                email_tracking.sent = sent
+            # Log the current status before update
+            app.logger.info(f"Updating 'sent' status for EmailTracking entry with ID: {id}. Current status - Sent: {email_tracking.sent}")
+
+            # Update the 'sent' status
+            email_tracking.sent = True
 
             # Commit the changes to the database
             db.session.commit()
-            app.logger.info(f"EmailTracking entry with ID {id} updated successfully.")
+
+            # Log after the commit
+            app.logger.info(f"Updated 'sent' status for EmailTracking entry with ID: {id}. New status - Sent: {email_tracking.sent}")
             return True
         else:
             app.logger.warning(f"No EmailTracking entry found with ID: {id}")
             return False
     except Exception as e:
-        app.logger.error(f"Error updating EmailTracking entry with ID: {id}. Error: {e}")
+        app.logger.error(f"Error updating 'sent' status for EmailTracking entry with ID: {id}. Error: {e}")
+        db.session.rollback()  # Rollback in case of an error
         return False
+
+
+from sqlalchemy.exc import IntegrityError
 
 @app.route('/send_bulk_email/<int:bulk_email_id>', methods=['GET', 'POST'])
 def send_bulk_email(bulk_email_id):
     if 'user' not in session:
-        return redirect(url_for('content', page='home'))
+        return redirect(url_for('home'))
+
     user = User.query.filter_by(username=session['user']).first()
     if user is None:
         flash('User not found. Please log in again.')
-        return redirect(url_for('content', page='login'))
+        return redirect(url_for('login'))
+
     bulk_email = BulkEmailInstance.query.get_or_404(bulk_email_id)
+
     if not user.yagmail_user or not user.yagmail_password:
         flash('Email settings are required before sending emails.')
-        return redirect(url_for('content', page='email_settings'))
+        return redirect(url_for('email_settings'))
 
     with open(bulk_email.csv_file, mode='r') as file:
         reader = csv.DictReader(file)
-        
+
         for row in reader:
             email = row['email']
             tracking_url = url_for('track_email', id=str(uuid.uuid4()), _external=True)
 
             # Check if an entry already exists for this email and bulk_email_id
-            existing_tracking = EmailTracking.query.filter_by(
-                email=email, bulk_email_id=bulk_email_id
-            ).first()
+            existing_tracking = EmailTracking.query.filter_by(email=email, bulk_email_id=bulk_email_id).first()
 
             if existing_tracking:
-                # Update the existing entry's sent status
+                # If a duplicate entry exists, update the 'sent' status instead of inserting
                 try:
+                    # Resend the email and update the existing entry's 'sent' status
                     send_email(user.yagmail_user, user.yagmail_password, email, row, bulk_email.subject_template, bulk_email.content_template, tracking_url, bulk_email.id)
-                    existing_tracking.sent = True
-                except Exception as e:
-                    app.logger.error(f"Failed to send email to {email}. Error: {e}")
-                    existing_tracking.sent = False
-                
-                # Commit the changes to update the sent status
-                db.session.commit()
 
+                    # Update the 'sent' status for the existing entry
+                    if update_sent_status(existing_tracking.id):
+                        flash(f"Updated and resent email to {email}.")
+                    else:
+                        flash(f"Failed to update the tracking entry for {email}.")
+                except Exception as e:
+                    app.logger.error(f"Failed to resend email to {email}. Error: {e}")
+                    db.session.rollback()  # Rollback if an error occurs
             else:
-                # Create a new tracking entry only if it doesn't exist
                 try:
+                    # Send email and create a new tracking entry if no duplicate exists
                     send_email(user.yagmail_user, user.yagmail_password, email, row, bulk_email.subject_template, bulk_email.content_template, tracking_url, bulk_email.id)
-                    sent_status = True
-                except Exception as e:
-                    app.logger.error(f"Failed to send email to {email}. Error: {e}")
-                    sent_status = False
 
-                # Create a new tracking entry
-                email_tracking = EmailTracking(
-                    id=str(uuid.uuid4()),
-                    email=email,
-                    name=row['name'],
-                    opened=False,
-                    sent=sent_status,
-                    bulk_email_id=bulk_email_id
-                )
-                db.session.add(email_tracking)
-                db.session.commit()
+                    # Create a new tracking entry after sending the email
+                    email_tracking = EmailTracking(
+                        id=str(uuid.uuid4()),
+                        email=email,
+                        name=row['name'],
+                        opened=False,
+                        sent=True,
+                        bulk_email_id=bulk_email_id
+                    )
+                    db.session.add(email_tracking)
+                    db.session.commit()
+                    flash(f"Email sent to {email}.")
+                except IntegrityError as e:
+                    # Handle IntegrityError for duplicates and rollback
+                    app.logger.error(f"IntegrityError for {email}. Error: {e}")
+                    db.session.rollback()  # Rollback after IntegrityError
+                except Exception as e:
+                    # Handle any other exceptions
+                    app.logger.error(f"Failed to send email to {email}. Error: {e}")
+                    db.session.rollback()
 
     flash('Emails have been sent!')
     return redirect(url_for('email_report', bulk_email_id=bulk_email_id))
@@ -342,15 +357,6 @@ def email_report(bulk_email_id):
         tracking_data = [tracking for tracking in tracking_data if not tracking.opened]
 
     return render_template('email_report.html', tracking_data=tracking_data, bulk_email=bulk_email, filter=filter_option)
-
-@app.errorhandler(404)
-def not_found_error(error):
-    return render_template('error.html'), 404
-
-@app.errorhandler(500)
-def internal_error(error):
-    # Add logging or other error handling here if needed
-    return render_template('error.html'), 500
 
 if __name__ == '__main__':
     app.run(debug=True)
