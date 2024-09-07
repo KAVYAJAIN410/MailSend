@@ -260,23 +260,22 @@ def update_email_tracking(id, opened=None, sent=None):
         app.logger.error(f"Error updating EmailTracking entry with ID: {id}. Error: {e}")
         return False
 
-
-
 @app.route('/send_bulk_email/<int:bulk_email_id>', methods=['GET', 'POST'])
 def send_bulk_email(bulk_email_id):
     if 'user' not in session:
-        return redirect(url_for('home'))
+        return redirect(url_for('content', page='home'))
     user = User.query.filter_by(username=session['user']).first()
     if user is None:
         flash('User not found. Please log in again.')
-        return redirect(url_for('login'))
+        return redirect(url_for('content', page='login'))
     bulk_email = BulkEmailInstance.query.get_or_404(bulk_email_id)
     if not user.yagmail_user or not user.yagmail_password:
         flash('Email settings are required before sending emails.')
-        return redirect(url_for('email_settings'))
+        return redirect(url_for('content', page='email_settings'))
 
     with open(bulk_email.csv_file, mode='r') as file:
         reader = csv.DictReader(file)
+        
         for row in reader:
             email = row['email']
             tracking_url = url_for('track_email', id=str(uuid.uuid4()), _external=True)
@@ -287,30 +286,37 @@ def send_bulk_email(bulk_email_id):
             ).first()
 
             if existing_tracking:
-                # Update the existing entry with new send status or any other changes
+                # Update the existing entry's sent status
                 try:
                     send_email(user.yagmail_user, user.yagmail_password, email, row, bulk_email.subject_template, bulk_email.content_template, tracking_url, bulk_email.id)
-                    update_email_tracking(existing_tracking.id, sent=True)
-                    flash(f"Updated and resent email to {email}.")
-                except Exception as e:
-                    app.logger.error(f"Failed to resend email to {email}. Error: {e}")
-            else:
-                # Send email and create a new tracking entry
-                try:
-                    send_email(user.yagmail_user, user.yagmail_password, email, row, bulk_email.subject_template, bulk_email.content_template, tracking_url, bulk_email.id)
-                    email_tracking = EmailTracking(
-                        id=str(uuid.uuid4()),
-                        email=email,
-                        name=row['name'],
-                        opened=False,
-                        sent=True,
-                        bulk_email_id=bulk_email_id
-                    )
-                    db.session.add(email_tracking)
-                    db.session.commit()
-                    flash(f"Email sent to {email}.")
+                    existing_tracking.sent = True
                 except Exception as e:
                     app.logger.error(f"Failed to send email to {email}. Error: {e}")
+                    existing_tracking.sent = False
+                
+                # Commit the changes to update the sent status
+                db.session.commit()
+
+            else:
+                # Create a new tracking entry only if it doesn't exist
+                try:
+                    send_email(user.yagmail_user, user.yagmail_password, email, row, bulk_email.subject_template, bulk_email.content_template, tracking_url, bulk_email.id)
+                    sent_status = True
+                except Exception as e:
+                    app.logger.error(f"Failed to send email to {email}. Error: {e}")
+                    sent_status = False
+
+                # Create a new tracking entry
+                email_tracking = EmailTracking(
+                    id=str(uuid.uuid4()),
+                    email=email,
+                    name=row['name'],
+                    opened=False,
+                    sent=sent_status,
+                    bulk_email_id=bulk_email_id
+                )
+                db.session.add(email_tracking)
+                db.session.commit()
 
     flash('Emails have been sent!')
     return redirect(url_for('email_report', bulk_email_id=bulk_email_id))
