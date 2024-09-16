@@ -13,7 +13,7 @@ app.config['UPLOAD_FOLDER'] = 'uploads'
 app.secret_key = 'your_secret_key'  # Required for flash messages
 
 # MongoDB client and database setup
-client = MongoClient('mongodb://localhost:27017/')
+client = MongoClient('mongodb+srv://iamaipalendrome:<db_password>@cluster0.clrz1.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0')
 db = client['email_db']
 users_collection = db['users']
 bulk_email_instances_collection = db['bulk_email_instances']
