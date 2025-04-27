@@ -469,5 +469,5 @@ def email_report(bulk_email_id):
 
     return render_template('email_report.html', tracking_data=tracking_data, bulk_email=bulk_email, filter=filter_option)
 
-if __name__ == '__main__':
-    app.run(debug=True)
+if __name__ == "__main__":
+    app.run(host='0.0.0.0', port=5000, debug=True)
