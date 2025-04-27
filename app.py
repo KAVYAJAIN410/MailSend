@@ -5,11 +5,42 @@ import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename
 import uuid
 
+ALLOWED_EXTENSIONS = {'pdf', 'csv'}
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+def send_email_with_attachment(yagmail_user, yagmail_password, email, row, subject_template, content_template,bulk_email_id, pdf_file_paths):
+    yag = yagmail.SMTP(yagmail_user, yagmail_password)
+    
+    subject = replace_tags(subject_template, row)
+    contents = replace_tags(content_template, row) 
+
+    # Prepare attachments
+    attachments = []
+    for pdf_file_path in pdf_file_paths:
+        if pdf_file_path:  # Add all PDFs to attachments
+            attachments.append(pdf_file_path)
+
+    try:
+        yag.send(to=email, subject=subject, contents=[contents], attachments=attachments)
+        with app.app_context():
+            app.logger.info(f"Email sent to {row['name']} at {email}")
+            email_tracking = EmailTracking(id=str(uuid.uuid4()), email=email, name=row['name'], bulk_email_id=bulk_email_id)
+            db.session.add(email_tracking)
+            db.session.commit()
+        return None
+    except Exception as e:
+        with app.app_context():
+            app.logger.error(f"Failed to send email to {row['name']} at {email}. Error: {e}")
+        return {'email': email, 'name': row['name'], 'error': str(e)}
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://sql12729491:55dB6xaFqJ@sql12.freesqldatabase.com:3306/sql12729491'
+app.config['SQLALCHEMY_DATABASE_URI'] ='postgresql://neondb_owner:npg_8ZkFcr5IaRUg@ep-lucky-haze-a4x87zbq-pooler.us-east-1.aws.neon.tech/neondb?sslmode=require'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.secret_key = 'your_secret_key'  # Required for flash messages
 
@@ -35,7 +66,9 @@ class BulkEmailInstance(db.Model):
     subject_template = db.Column(db.String(200))
     content_template = db.Column(db.Text)
     csv_file = db.Column(db.String(200))
+    pdf_files = db.Column(db.PickleType)  # Store list of PDF file paths
     email_trackings = db.relationship('EmailTracking', backref='bulk_email_instance', lazy=True)
+
 
 # Email tracking model
 class EmailTracking(db.Model):
@@ -53,34 +86,20 @@ class EmailTracking(db.Model):
 with app.app_context():
     db.create_all()
 
-def log_email_open(id):
-    app.logger.info(f"Tracking pixel accessed for ID: {id}")
-    try:
-        email_tracking = EmailTracking.query.get(id)
-        if email_tracking:
-            app.logger.info(f"EmailTracking entry found for ID: {id}")
-            email_tracking.opened = True
-            db.session.commit()
-            app.logger.info(f"EmailTracking entry updated for ID: {id}")
-        else:
-            app.logger.warning(f"No EmailTracking entry found for ID: {id}")
-    except Exception as e:
-        app.logger.error(f"Error updating EmailTracking entry for ID: {id}. Error: {e}")
+
 
 @app.route('/track/<id>.png')
-def track_email(id):
-    log_email_open(id)
-    return send_file('tracking_pixel.png', mimetype='image/png')
+
 
 def replace_tags(template, row):
     for key, value in row.items():
         template = template.replace(f"{{{{{key}}}}}", value)
     return template
 
-def send_email(yagmail_user, yagmail_password, email, row, subject_template, content_template, tracking_url, bulk_email_id):
+def send_email(yagmail_user, yagmail_password, email, row, subject_template, content_template, bulk_email_id):
     unique_id = str(uuid.uuid4())
     subject = replace_tags(subject_template, row)
-    contents = replace_tags(content_template, row) + f'<img src="{tracking_url}" alt="Tracking Pixel" style="display:none;"/>'
+    contents = replace_tags(content_template, row) 
 
     yag = yagmail.SMTP(yagmail_user, yagmail_password)
 
@@ -88,7 +107,7 @@ def send_email(yagmail_user, yagmail_password, email, row, subject_template, con
         yag.send(to=email, subject=subject, contents=[contents])
         with app.app_context():
             app.logger.info(f"Email sent to {row['name']} at {email}")
-            app.logger.info(f"Tracking URL embedded in email: {tracking_url}")
+            
 
             email_tracking = EmailTracking(id=unique_id, email=email, name=row['name'], bulk_email_id=bulk_email_id)
             db.session.add(email_tracking)
@@ -217,52 +236,46 @@ def create_bulk_email():
 def bulk_email(bulk_email_id):
     if 'user' not in session:
         return redirect(url_for('home'))
+
     user = User.query.filter_by(username=session['user']).first()
     if user is None:
         flash('User not found. Please log in again.')
         return redirect(url_for('login'))
+
     bulk_email = BulkEmailInstance.query.get_or_404(bulk_email_id)
     if request.method == 'POST':
         subject_template = request.form['subject']
         content_template = request.form['content']
         csv_file = request.files.get('csv_file')
+        pdf_files = request.files.getlist('pdf_files')  # Get list of uploaded PDF files
+        
         if not subject_template or not content_template or not csv_file:
             flash('All fields are required.')
             return redirect(url_for('bulk_email', bulk_email_id=bulk_email_id))
+        
+        # Handle PDF file uploads
+        pdf_paths = []
+        for pdf_file in pdf_files:
+            if pdf_file and allowed_file(pdf_file.filename):
+                pdf_filename = secure_filename(pdf_file.filename)
+                pdf_path = os.path.join(app.config['UPLOAD_FOLDER'], pdf_filename)
+                pdf_file.save(pdf_path)
+                pdf_paths.append(pdf_path)
+        
         file_path = os.path.join(app.config['UPLOAD_FOLDER'], csv_file.filename)
         csv_file.save(file_path)
+        
         bulk_email.subject_template = subject_template
         bulk_email.content_template = content_template
         bulk_email.csv_file = file_path
+        bulk_email.pdf_files = pdf_paths  # Save list of PDF file paths
         db.session.commit()
+
         return redirect(url_for('send_bulk_email', bulk_email_id=bulk_email.id))
+
     return render_template('bulk_email.html', bulk_email=bulk_email)
 
-def update_sent_status(id):
-    try:
-        # Find the entry by ID
-        email_tracking = EmailTracking.query.get(id)
 
-        if email_tracking:
-            # Log the current status before update
-            app.logger.info(f"Updating 'sent' status for EmailTracking entry with ID: {id}. Current status - Sent: {email_tracking.sent}")
-
-            # Update the 'sent' status
-            email_tracking.sent = True
-
-            # Commit the changes to the database
-            db.session.commit()
-
-            # Log after the commit
-            app.logger.info(f"Updated 'sent' status for EmailTracking entry with ID: {id}. New status - Sent: {email_tracking.sent}")
-            return True
-        else:
-            app.logger.warning(f"No EmailTracking entry found with ID: {id}")
-            return False
-    except Exception as e:
-        app.logger.error(f"Error updating 'sent' status for EmailTracking entry with ID: {id}. Error: {e}")
-        db.session.rollback()  # Rollback in case of an error
-        return False
 
 
 from sqlalchemy.exc import IntegrityError
@@ -288,29 +301,39 @@ def send_bulk_email(bulk_email_id):
 
         for row in reader:
             email = row['email']
-            tracking_url = url_for('track_email', id=str(uuid.uuid4()), _external=True)
+            name = row['name']
+            company_name = row['company']
+
+            # Personalize the email content
+            contents = bulk_email.content_template
+            contents = contents.replace("[POC Name]", name).replace("<Company_name>", company_name)
+
+            print(contents)
+            
 
             # Check if an entry already exists for this email and bulk_email_id
             existing_tracking = EmailTracking.query.filter_by(email=email, bulk_email_id=bulk_email_id).first()
 
+            # Collect the PDF file paths (if any)
+            pdf_file_paths = bulk_email.pdf_files  # Assuming `pdf_files` is a list of file paths
+
             if existing_tracking:
                 # If a duplicate entry exists, update the 'sent' status instead of inserting
-                try:
-                    # Resend the email and update the existing entry's 'sent' status
-                    send_email(user.yagmail_user, user.yagmail_password, email, row, bulk_email.subject_template, bulk_email.content_template, tracking_url, bulk_email.id)
-
-                    # Update the 'sent' status for the existing entry
-                    if update_sent_status(existing_tracking.id):
-                        flash(f"Updated and resent email to {email}.")
-                    else:
-                        flash(f"Failed to update the tracking entry for {email}.")
-                except Exception as e:
-                    app.logger.error(f"Failed to resend email to {email}. Error: {e}")
-                    db.session.rollback()  # Rollback if an error occurs
+              pass  
+              
             else:
                 try:
                     # Send email and create a new tracking entry if no duplicate exists
-                    send_email(user.yagmail_user, user.yagmail_password, email, row, bulk_email.subject_template, bulk_email.content_template, tracking_url, bulk_email.id)
+                    send_email_with_attachment(
+                        yagmail_user=user.yagmail_user,
+                        yagmail_password=user.yagmail_password,
+                        email=email,
+                        row=row,
+                        subject_template=bulk_email.subject_template,
+                        content_template=contents,
+                        bulk_email_id=bulk_email.id,
+                        pdf_file_paths=pdf_file_paths
+                    )
 
                     # Create a new tracking entry after sending the email
                     email_tracking = EmailTracking(
@@ -335,6 +358,94 @@ def send_bulk_email(bulk_email_id):
 
     flash('Emails have been sent!')
     return redirect(url_for('email_report', bulk_email_id=bulk_email_id))
+
+@app.route('/resend_email/<int:bulk_email_id>', methods=['POST'])
+def resend_email(bulk_email_id):
+    if 'user' not in session:
+        return redirect(url_for('home'))
+
+    user = User.query.filter_by(username=session['user']).first()
+    if user is None:
+        flash('User not found. Please log in again.')
+        return redirect(url_for('login'))
+
+    bulk_email = BulkEmailInstance.query.get_or_404(bulk_email_id)
+
+    if not user.yagmail_user or not user.yagmail_password:
+        flash('Email settings are required before sending emails.')
+        return redirect(url_for('email_settings'))
+
+    # Check if the user uploaded a CSV file
+    csv_file = request.files['csv_file']
+    if not csv_file:
+        flash('No CSV file uploaded.')
+        return redirect(url_for('email_report', bulk_email_id=bulk_email_id))
+
+    # Save the CSV file temporarily
+    file_path = os.path.join(app.config['UPLOAD_FOLDER'], csv_file.filename)
+    csv_file.save(file_path)
+
+    # Process the CSV file and resend emails
+    with open(file_path, mode='r') as file:
+        reader = csv.DictReader(file)
+
+        for row in reader:
+            email = row['email']
+            name = row['name']
+            company_name = row['company']
+
+            # Create a personalized email content
+            contents = bulk_email.content_template
+            pdf_file_paths = bulk_email.pdf_files
+            contents = contents.replace("[POC Name]", name).replace("<Company_name>", company_name)
+            
+            # Generate the tracking URL
+
+
+            # Check if an entry already exists for this email and bulk_email_id
+            existing_tracking = EmailTracking.query.filter_by(email=email, bulk_email_id=bulk_email_id).first()
+
+            if existing_tracking:
+                # If the email has already been sent to this user, update the 'sent' status
+                pass
+            
+            else:
+                try:
+                    # Send email and create a new tracking entry if no duplicate exists
+                    send_email_with_attachment(
+                        yagmail_user=user.yagmail_user,
+                        yagmail_password=user.yagmail_password,
+                        email=email,
+                        row=row,
+                        subject_template=bulk_email.subject_template,
+                        content_template=contents,
+                        bulk_email_id=bulk_email.id,
+                        pdf_file_paths=pdf_file_paths
+                    )
+
+
+                    # Create a new tracking entry after sending the email
+                    email_tracking = EmailTracking(
+                        id=str(uuid.uuid4()),
+                        email=email,
+                        name=row['name'],
+                        opened=False,
+                        sent=True,
+                        bulk_email_id=bulk_email_id
+                    )
+                    db.session.add(email_tracking)
+                    db.session.commit()
+                    flash(f"Email sent to {email}.")
+                except IntegrityError as e:
+                    app.logger.error(f"IntegrityError for {email}. Error: {e}")
+                    db.session.rollback()
+                except Exception as e:
+                    app.logger.error(f"Failed to send email to {email}. Error: {e}")
+                    db.session.rollback()
+
+    flash('Emails have been resent!')
+    return redirect(url_for('email_report', bulk_email_id=bulk_email_id))
+
 
 @app.route('/email_report/<int:bulk_email_id>', methods=['GET'])
 def email_report(bulk_email_id):

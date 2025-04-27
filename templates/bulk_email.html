@@ -3,87 +3,200 @@
 {% block title %}Bulk Email Settings{% endblock %}
 
 {% block content %}
-<h1>Bulk Email Settings for "{{ bulk_email.name }}"</h1>
-<form action="{{ url_for('bulk_email', bulk_email_id=bulk_email.id) }}" method="post" enctype="multipart/form-data">
-    <label for="subject">Email Subject:</label>
-    <input type="text" id="subject" name="subject" value="{{ bulk_email.subject_template }}" required><br><br>
-    
-    <label for="content">Email Content:</label><br>
-    <textarea id="content" name="content" rows="4" cols="50" required>{{ bulk_email.content_template }}</textarea><br><br>
-    
-    <div id="suggestions" class="suggestions-box">
-        <ul>
-            {% raw %}
-            <li>{{name}}</li>
-            <li>{{company}}</li>
-            <li>{{age}}</li>
-            {% endraw %}
-            <!-- Add other placeholders here -->
-        </ul>
+    <div class="container">
+        <h1 class="page-title">Bulk Email Settings for "{{ bulk_email.name }}"</h1>
+
+        <form action="{{ url_for('bulk_email', bulk_email_id=bulk_email.id) }}" method="post" enctype="multipart/form-data" class="form-container">
+            <div class="form-group">
+                <label for="subject">Email Subject:</label>
+                <input type="text" id="subject" name="subject" value="{{ bulk_email.subject_template }}" required>
+            </div>
+
+            <div class="form-group">
+                <label for="content">Email Content:</label>
+                <textarea id="content" name="content" rows="6" required>{{ bulk_email.content_template }}</textarea>
+            </div>
+
+            <div id="suggestions" class="suggestions-box">
+                <ul>
+                    {% raw %}
+                        <li>{{name}}</li>
+                        <li>{{company}}</li>
+                        <li>{{age}}</li>
+                    {% endraw %}
+                </ul>
+            </div>
+
+            <div class="form-group">
+                <label for="csv_file">CSV File:</label>
+                <input type="file" id="csv_file" name="csv_file" accept=".csv" required>
+            </div>
+
+            <div class="form-group">
+                <label for="pdf_files">PDF Attachments:</label>
+                <div id="pdf_file_inputs">
+                    <input type="file" name="pdf_files" accept=".pdf">
+                </div>
+                <button type="button" id="add_pdf_button" class="add-pdf-button">+ Add another PDF</button>
+            </div>
+
+            <div class="form-group submit-group">
+                <input type="submit" value="Save and Send" class="submit-button">
+            </div>
+        </form>
     </div>
-    
-    <label for="csv_file">CSV File:</label>
-    <input type="file" id="csv_file" name="csv_file" accept=".csv" required><br><br>
-    
-    <input type="submit" value="Save and Send">
-</form>
 
-<style>
-.suggestions-box {
-    display: none;
-    position: absolute;
-    border: 1px solid #ccc;
-    background-color: #fff;
-    z-index: 1000;
-    max-height: 150px;
-    overflow-y: auto;
-}
-
-.suggestions-box ul {
-    list-style-type: none;
-    padding: 0;
-    margin: 0;
-}
-
-.suggestions-box li {
-    padding: 8px;
-    cursor: pointer;
-}
-
-.suggestions-box li:hover {
-    background-color: #f0f0f0;
-}
-</style>
-
-<script>
-document.addEventListener('DOMContentLoaded', (event) => {
-    const textarea = document.getElementById('content');
-    const suggestionsBox = document.getElementById('suggestions');
-
-    textarea.addEventListener('input', function(e) {
-        const value = textarea.value;
-        const cursorPos = textarea.selectionStart;
-
-        if (value.substring(cursorPos - 2, cursorPos) === '//') {
-            const rect = textarea.getBoundingClientRect();
-            suggestionsBox.style.display = 'block';
-            suggestionsBox.style.left = `${rect.left + window.scrollX}px`;
-            suggestionsBox.style.top = `${rect.top + window.scrollY + textarea.offsetHeight}px`;
-        } else {
-            suggestionsBox.style.display = 'none';
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f4f7fc;
+            color: #333;
+            margin: 0;
+            padding: 0;
         }
-    });
 
-    document.querySelectorAll('.suggestions-box li').forEach(item => {
-        item.addEventListener('click', event => {
-            const placeholder = item.innerText;
-            const cursorPos = textarea.selectionStart;
-            const textBefore = textarea.value.substring(0, cursorPos - 2); // Remove the // trigger
-            const textAfter = textarea.value.substring(cursorPos);
-            textarea.value = textBefore + placeholder + textAfter;
-            suggestionsBox.style.display = 'none';
+        .container {
+            width: 80%;
+            margin: 0 auto;
+            padding-top: 40px;
+        }
+
+        .page-title {
+            text-align: center;
+            font-size: 36px;
+            color: #2a2a2a;
+            margin-bottom: 20px;
+        }
+
+        .form-container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            font-size: 16px;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+
+        .form-group textarea {
+            resize: vertical;
+        }
+
+        .suggestions-box {
+            display: none;
+            position: absolute;
+            border: 1px solid #ccc;
+            background-color: #fff;
+            z-index: 1000;
+            max-height: 150px;
+            overflow-y: auto;
+            margin-top: 5px;
+            width: 95%;
+        }
+
+        .suggestions-box ul {
+            list-style-type: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .suggestions-box li {
+            padding: 8px;
+            cursor: pointer;
+        }
+
+        .suggestions-box li:hover {
+            background-color: #f0f0f0;
+        }
+
+        .add-pdf-button {
+            background-color: #007bff;
+            color: white;
+            padding: 8px 15px;
+            font-size: 16px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .add-pdf-button:hover {
+            background-color: #0056b3;
+        }
+
+        .submit-button {
+            background-color: #28a745;
+            color: white;
+            padding: 10px 20px;
+            font-size: 18px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            width: 100%;
+        }
+
+        .submit-button:hover {
+            background-color: #218838;
+        }
+    </style>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', (event) => {
+            const textarea = document.getElementById('content');
+            const suggestionsBox = document.getElementById('suggestions');
+            const addPdfButton = document.getElementById('add_pdf_button');
+            const pdfFileInputs = document.getElementById('pdf_file_inputs');
+
+            // Add new PDF input field when the button is clicked
+            addPdfButton.addEventListener('click', function() {
+                const newInput = document.createElement('input');
+                newInput.type = 'file';
+                newInput.name = 'pdf_files';  // Keep the name the same so Flask can handle it as a list
+                newInput.accept = '.pdf';
+                pdfFileInputs.appendChild(newInput);
+                pdfFileInputs.appendChild(document.createElement('br'));  // Add a line break after the new input
+            });
+
+            textarea.addEventListener('input', function(e) {
+                const value = textarea.value;
+                const cursorPos = textarea.selectionStart;
+
+                if (value.substring(cursorPos - 2, cursorPos) === '//') {
+                    const rect = textarea.getBoundingClientRect();
+                    suggestionsBox.style.display = 'block';
+                    suggestionsBox.style.left = `${rect.left + window.scrollX}px`;
+                    suggestionsBox.style.top = `${rect.top + window.scrollY + textarea.offsetHeight}px`;
+                } else {
+                    suggestionsBox.style.display = 'none';
+                }
+            });
+
+            document.querySelectorAll('.suggestions-box li').forEach(item => {
+                item.addEventListener('click', event => {
+                    const placeholder = item.innerText;
+                    const cursorPos = textarea.selectionStart;
+                    const textBefore = textarea.value.substring(0, cursorPos - 2); // Remove the // trigger
+                    const textAfter = textarea.value.substring(cursorPos);
+                    textarea.value = textBefore + placeholder + textAfter;
+                    suggestionsBox.style.display = 'none';
+                });
+            });
         });
-    });
-});
-</script>
+    </script>
 {% endblock %}

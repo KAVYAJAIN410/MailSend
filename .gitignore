@@ -1,10 +1,28 @@
+# Ignore IDE folders
 .idea/
 .vscode/
-.venv*/
-venv*/
+
+# Ignore virtual environments
+.venv/
+venv/
+
+# Ignore Python bytecode
 __pycache__/
+
+# Ignore build and distribution folders
 dist/
+build/
+*.egg-info/
+
+# Ignore coverage reports
 .coverage*
 htmlcov/
+
+# Ignore tox environment
 .tox/
+
+# Ignore documentation build folder
 docs/_build/
+
+# Other Python-related ignores
+*.log

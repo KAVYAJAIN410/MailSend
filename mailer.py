@@ -7,7 +7,7 @@ def send_emails_from_csv(csv_file, yagmail_user, yagmail_password):
 
     # Ask user for the email subject and content template
     subject_template = input("Enter the email subject (use {name} to include the recipient's name): ")
-    content_template = input("Enter the email content (use {name} to include the recipient's name): ")
+    content_template = input("Enter the email content (use {name} to include the recipient's name and {company} for the company name): ")
 
     with yagmail.SMTP(yagmail_user, yagmail_password) as yag:
         with open(csv_file, mode='r') as file:
@@ -16,10 +16,15 @@ def send_emails_from_csv(csv_file, yagmail_user, yagmail_password):
             for row in reader:
                 email = row['email']
                 name = row['name']
+                company_name = row['company']
 
                 # Personalize the email content
-                subject = subject_template.format(name=name)
-                contents = content_template.format(name=name)
+                subject = subject_template.format(name=name)  # Replace name in subject
+                contents = f"{content_template}"
+                contents = contents.replace("{name}", name).replace("{company}", company_name)
+                
+                print(contents)
+
 
                 # Send the email
                 try:
@@ -36,8 +41,8 @@ def send_emails_from_csv(csv_file, yagmail_user, yagmail_password):
             print(f"Email: {entry['email']}, Name: {entry['name']}, Error: {entry['error']}")
 
 # Yagmail user credentials
-YAGMAIL_USER = 's.abhaysastha@gmail.com'
-YAGMAIL_APP_PASSWORD = 'tigveghwvxswxuxx'  # Not the plain password
+YAGMAIL_USER = 'kavya.jain2023@vitstudent.ac.in'
+YAGMAIL_APP_PASSWORD = 'topj bxcc uvul ioyw'  # Not the plain password
 
 # Path to the CSV file
 CSV_FILE_PATH = 'emails.csv'
